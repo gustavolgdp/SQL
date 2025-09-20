@@ -1,0 +1,44 @@
+SELECT
+    SUBSTRING(CAST(sl.dia AS CHAR), 1, 4) AS ANO,
+    SUBSTRING(CAST(sl.dia AS CHAR), 6, 2) AS MES,
+    SUBSTRING(CAST(sl.dia AS CHAR), 9, 2) AS DIA,
+    SUBSTRING(sl.h_ini, 1, 5) AS INICIO,
+    SUBSTRING(sl.h_fim, 1, 5) AS FIM,
+    COUNT(DISTINCT CASE WHEN LOWER(LEFT(s.nome,1))='t' THEN s.id END) AS QT_CTR,
+    COUNT(DISTINCT CASE WHEN LOWER(LEFT(s.nome,1))='a' THEN s.id END) AS QT_ASS,
+    COUNT(DISTINCT CASE WHEN LOWER(LEFT(s.nome,1))='c' THEN s.id END) AS QT_COOR,
+    COUNT(DISTINCT CASE WHEN LOWER(LEFT(s.nome,1))='s' THEN s.id END) AS QT_SPVS,
+    COUNT(DISTINCT s.id) AS QT_TOTAL,
+    GROUP_CONCAT(DISTINCT CASE WHEN LOWER(LEFT(s.nome,1))='t' THEN UPPER(s.nome) END
+                 ORDER BY UPPER(s.nome) SEPARATOR ',') AS P_CTR,
+    GROUP_CONCAT(DISTINCT CASE WHEN LOWER(LEFT(s.nome,1))='a' THEN UPPER(s.nome) END
+                 ORDER BY UPPER(s.nome) SEPARATOR ',') AS P_ASS,
+    GROUP_CONCAT(DISTINCT CASE WHEN LOWER(LEFT(s.nome,1))='c' THEN UPPER(s.nome) END
+                 ORDER BY UPPER(s.nome) SEPARATOR ',') AS P_COOR
+  FROM (
+    SELECT
+      edc.id   AS escala_dia_id,
+      edc.date AS dia,
+      CAST(JSON_UNQUOTE(JSON_EXTRACT(std.horarios, CONCAT('$[', n.pos-1, '].id'))) AS UNSIGNED) AS slot_id,
+      CAST(JSON_UNQUOTE(JSON_EXTRACT(std.horarios, CONCAT('$[', n.pos-1, '].horario_inicio'))) AS CHAR(8)) AS h_ini,
+      CAST(JSON_UNQUOTE(JSON_EXTRACT(std.horarios, CONCAT('$[', n.pos-1, '].horario_fim')))    AS CHAR(8)) AS h_fim
+    FROM escala_diaria_criadas edc
+    JOIN sub_turnos_escala_diarias std
+      ON std.id = edc.sub_turno_escala_diaria_id
+    JOIN (
+      SELECT 1 pos UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL
+      SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL
+      SELECT 9 UNION ALL SELECT 10 UNION ALL SELECT 11 UNION ALL SELECT 12 UNION ALL
+      SELECT 13 UNION ALL SELECT 14 UNION ALL SELECT 15 UNION ALL SELECT 16
+    ) n
+      ON n.pos <= JSON_LENGTH(std.horarios)
+  ) sl
+  JOIN setorizacoes_escala_diarias sed
+    ON sed.escalas_diarias_criadas_id = sl.escala_dia_id
+   AND sed.ativado = 1
+   AND sed.horario_sub_turno_id = sl.slot_id
+  JOIN setors s
+    ON s.id = sed.setor_id
+  -- WHERE sl.dia BETWEEN '2025-01-01' AND '2025-01-31'   -- opcional p/ filtrar período
+  GROUP BY sl.escala_dia_id, sl.slot_id, sl.h_ini, sl.h_fim, sl.dia
+  ORDER BY sl.dia, sl.slot_id;
